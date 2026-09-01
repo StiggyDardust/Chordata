@@ -187,6 +187,22 @@
     font-size:0.78rem;
     padding-bottom:8px;
   }
+  .chord-row.relative-minor{
+    background:rgba(124,156,232,0.07);
+    border-radius:8px;
+  }
+  .chord-row.relative-minor .degree{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:30px;
+    height:30px;
+    border:2px solid var(--brass);
+    border-radius:50%;
+    color:var(--brass);
+    font-weight:600;
+    font-size:0.92rem;
+  }
   .degree{ font-family:'Fraunces',serif; font-size:1.05rem; color:var(--ivory-dim); }
   .chord-name{ font-weight:600; font-size:1.05rem; }
   .chord-notes{ color:var(--ivory-dim); font-size:0.92rem; }
@@ -327,7 +343,7 @@
 
     <section class="panel" id="explorer">
       <h2>Pick a key</h2>
-      <p class="hint">Tap a note to see the seven chords that live inside its major key — tap any chord to hear it played.</p>
+      <p class="hint">Tap a note to see the seven chords that live inside its major key — tap any chord to hear it played. The circled chord is the relative minor.</p>
       <div class="piano" id="explorerPiano"></div>
       <div class="chord-table" id="explorerTable"></div>
     </section>
@@ -627,16 +643,17 @@ function renderExplorer(){
 
   const chords = getKeyChords(NOTES.indexOf(explorerKey));
   const table = document.getElementById("explorerTable");
-  table.innerHTML = rowsHTML(chords, true, true);
+  // The 6th chord (vi) of a major key is always its relative minor.
+  table.innerHTML = rowsHTML(chords, true, true, 5);
 }
 
-function rowsHTML(chords, withHeader, playable){
+function rowsHTML(chords, withHeader, playable, highlightIndex){
   let html = "";
   if(withHeader){
     html += `<div class="chord-row head"><span></span><span>Chord</span><span>Notes</span><span></span></div>`;
   }
-  chords.forEach(c => {
-    const rowClass = "chord-row" + (playable ? " playable" : "");
+  chords.forEach((c, i) => {
+    const rowClass = "chord-row" + (playable ? " playable" : "") + (i === highlightIndex ? " relative-minor" : "");
     const clickAttr = playable ? ` onclick="playChord(${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals)"` : "";
     html += `
       <div class="${rowClass}"${clickAttr}>
@@ -656,16 +673,34 @@ function rowsHTML(chords, withHeader, playable){
 const fromSelect = document.getElementById("fromKey");
 const toSelect = document.getElementById("toKey");
 
-fromSelect.innerHTML = `<option value="" selected disabled>Pick a Key</option>`;
-toSelect.innerHTML = `<option value="" selected disabled>Pick a Key</option>`;
-NOTES.forEach(n => {
-  fromSelect.innerHTML += `<option value="${n}:major">${n} major</option>`;
-  toSelect.innerHTML += `<option value="${n}:major">${n} major</option>`;
-});
-NOTES.forEach(n => {
-  fromSelect.innerHTML += `<option value="${n}:minor">${n} minor</option>`;
-  toSelect.innerHTML += `<option value="${n}:minor">${n} minor</option>`;
-});
+// Builds a key list, optionally locked to one mode ("major" or "minor").
+// Passing no mode lists every major and minor key.
+function populateKeySelect(selectEl, modeFilter){
+  let html = `<option value="" selected disabled>Pick a Key</option>`;
+  if(!modeFilter || modeFilter === "major"){
+    NOTES.forEach(n => { html += `<option value="${n}:major">${n} major</option>`; });
+  }
+  if(!modeFilter || modeFilter === "minor"){
+    NOTES.forEach(n => { html += `<option value="${n}:minor">${n} minor</option>`; });
+  }
+  selectEl.innerHTML = html;
+}
+
+populateKeySelect(fromSelect, null);
+populateKeySelect(toSelect, null);
+
+// Once one side picks a mode, the other side is limited to the same
+// mode — a major key only transposes to another major key, same for minor.
+function lockOtherToMode(changedSelect, otherSelect){
+  const val = changedSelect.value;
+  if(!val) return;
+  const mode = val.split(":")[1];
+  const prevOtherVal = otherSelect.value;
+  populateKeySelect(otherSelect, mode);
+  if(prevOtherVal && prevOtherVal.split(":")[1] === mode){
+    otherSelect.value = prevOtherVal;
+  }
+}
 
 function renderTransposer(){
   const fromVal = fromSelect.value;
@@ -698,8 +733,14 @@ function renderTransposer(){
     : `up ${shift} semitone${shift === 1 ? "" : "s"} (${INTERVAL_NAMES[shift]})`;
 }
 
-fromSelect.onchange = renderTransposer;
-toSelect.onchange = renderTransposer;
+fromSelect.onchange = () => {
+  lockOtherToMode(fromSelect, toSelect);
+  renderTransposer();
+};
+toSelect.onchange = () => {
+  lockOtherToMode(toSelect, fromSelect);
+  renderTransposer();
+};
 
 /* ============================================================
    SECTION 3 — CHORD BUILDER
