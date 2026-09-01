@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chordata</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --espresso:#1B2340;
+    --panel:#222B4D;
+    --panel-line: rgba(223,231,252,0.10);
+    --ivory:#EEF2FB;
+    --ivory-dim:#A6B1D1;
+    --brass:#7C9CE8;
+    --brass-dim: rgba(124,156,232,0.18);
+    --wine:#E0937E;
+    --wine-dim: rgba(224,147,126,0.18);
+    --sage:#7FC1B0;
+    --sage-dim: rgba(127,193,176,0.18);
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(124,156,232,0.10), transparent),
+      var(--espresso);
+    color:var(--ivory);
+    font-family:'Inter', sans-serif;
+    line-height:1.5;
+  }
+
+  h1,h2,h3{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    margin:0;
+  }
+
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:0 20px 80px;
+  }
+
+  header.hero{
+    padding:64px 0 40px;
+    text-align:center;
+  }
+
+  header.hero h1{
+    font-size:clamp(2.2rem, 6vw, 3.2rem);
+    letter-spacing:-0.01em;
+  }
+
+  header.hero p{
+    color:var(--ivory-dim);
+    max-width:440px;
+    margin:14px auto 0;
+    font-size:1.02rem;
+  }
+
+  .loading-banner{
+    display:none;
+    text-align:center;
+    color:var(--brass);
+    font-size:0.85rem;
+    margin:0 0 28px;
+  }
+  body.piano-loading .loading-banner{ display:block; }
+  body.piano-loading .piano,
+  body.piano-loading .type-btn,
+  body.piano-loading .chord-row.playable{
+    opacity:0.5;
+    pointer-events:none;
+  }
+
+  section.panel{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:14px;
+    padding:32px 24px;
+    margin-bottom:28px;
+  }
+
+  section.panel > h2{
+    font-size:1.4rem;
+    margin-bottom:6px;
+  }
+
+  section.panel > p.hint{
+    color:var(--ivory-dim);
+    font-size:0.92rem;
+    margin:0 0 22px;
+  }
+
+  /* ---------- piano selector ---------- */
+  .piano{
+    position:relative;
+    height:132px;
+    display:flex;
+    margin-bottom:26px;
+    filter: drop-shadow(0 10px 18px rgba(6,9,24,0.35));
+  }
+
+  .white-key{
+    flex:1;
+    background:linear-gradient(180deg, #FBFCFF 0%, #E7EBF6 88%, #DCE1F0 100%);
+    border:1px solid #C4CBE0;
+    border-top:none;
+    border-left:none;
+    border-radius:0 0 10px 10px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    padding-bottom:11px;
+    font-size:0.8rem;
+    color:#5B6488;
+    cursor:pointer;
+    user-select:none;
+    transition:background 0.15s ease, transform 0.1s ease;
+    box-shadow: inset 0 -3px 5px rgba(120,130,170,0.12);
+  }
+  .white-key:first-child{ border-left:1px solid #C4CBE0; border-radius:8px 0 10px 10px; }
+  .white-key:last-child{ border-radius:0 8px 10px 10px; }
+  .white-key:hover{ background:linear-gradient(180deg, #FFFFFF 0%, #EEF1FA 88%, #E2E7F4 100%); }
+  .white-key:active{ transform: translateY(1px); }
+  .white-key.selected{
+    background:linear-gradient(180deg, #93B2F0 0%, var(--brass) 100%);
+    color:#151B33;
+    font-weight:600;
+    box-shadow: inset 0 -3px 6px rgba(20,30,70,0.20), 0 0 0 2px rgba(124,156,232,0.35);
+  }
+
+  .black-key{
+    position:absolute;
+    top:0;
+    width:7.6%;
+    height:60%;
+    background:linear-gradient(160deg, #3A4368 0%, #171C33 70%);
+    border:1px solid #0C0F1F;
+    border-top:none;
+    border-radius:0 0 7px 7px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    padding-bottom:8px;
+    font-size:0.68rem;
+    color:var(--ivory-dim);
+    cursor:pointer;
+    user-select:none;
+    transition:background 0.15s ease, transform 0.1s ease;
+    box-shadow: 0 4px 6px rgba(6,9,24,0.4);
+  }
+  .black-key:hover{ background:linear-gradient(160deg, #46507A 0%, #1D2340 70%); }
+  .black-key:active{ transform: translateY(1px); }
+  .black-key.selected{
+    background:linear-gradient(160deg, var(--brass) 0%, #5A7BC9 100%);
+    border-color:var(--brass);
+    color:#151B33;
+    font-weight:600;
+    box-shadow: 0 0 0 3px rgba(124,156,232,0.30), 0 4px 8px rgba(6,9,24,0.45);
+  }
+
+  /* ---------- chord table ---------- */
+  .chord-table{ width:100%; }
+  .chord-row{
+    display:grid;
+    grid-template-columns: 44px 1fr 1.4fr auto;
+    align-items:center;
+    gap:12px;
+    padding:10px 6px;
+    border-bottom:1px solid var(--panel-line);
+  }
+  .chord-row:last-child{ border-bottom:none; }
+  .chord-row.playable{
+    cursor:pointer;
+    border-radius:8px;
+    transition:background 0.15s ease;
+  }
+  .chord-row.playable:hover{ background:rgba(124,156,232,0.10); }
+  .chord-row.playable:active{ background:rgba(124,156,232,0.18); }
+  .chord-row.head{
+    color:var(--ivory-dim);
+    font-size:0.78rem;
+    padding-bottom:8px;
+  }
+  .degree{ font-family:'Fraunces',serif; font-size:1.05rem; color:var(--ivory-dim); }
+  .chord-name{ font-weight:600; font-size:1.05rem; }
+  .chord-notes{ color:var(--ivory-dim); font-size:0.92rem; }
+  .quality-tag{
+    font-size:0.74rem;
+    padding:3px 9px;
+    border-radius:20px;
+    white-space:nowrap;
+    justify-self:end;
+  }
+  .quality-tag.major{ background:var(--brass-dim); color:var(--brass); }
+  .quality-tag.minor{ background:var(--wine-dim); color:var(--wine); }
+  .quality-tag.dim{ background:var(--sage-dim); color:var(--sage); }
+
+  /* ---------- transposer ---------- */
+  .transpose-controls{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+  .transpose-controls label{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    font-size:0.82rem;
+    color:var(--ivory-dim);
+  }
+  select{
+    font-family:'Inter',sans-serif;
+    font-size:1rem;
+    background:var(--espresso);
+    color:var(--ivory);
+    border:1px solid var(--panel-line);
+    border-radius:8px;
+    padding:9px 12px;
+  }
+  .shift-label{
+    color:var(--brass);
+    font-size:0.88rem;
+    margin-top:20px;
+    min-width:150px;
+    text-align:center;
+  }
+  .transpose-tables{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+    margin-top:22px;
+  }
+  .transpose-tables h3{
+    font-size:0.9rem;
+    color:var(--ivory-dim);
+    font-weight:500;
+    margin-bottom:10px;
+    text-align:center;
+  }
+  @media (max-width:560px){
+    .transpose-tables{ grid-template-columns:1fr; }
+    .chord-row{ grid-template-columns:32px 1fr 1fr; }
+    .chord-row .quality-tag{ display:none; }
+  }
+
+  /* ---------- chord builder ---------- */
+  .chord-types{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:24px;
+  }
+  .type-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .type-btn{
+    background:var(--espresso);
+    border:1px solid var(--panel-line);
+    color:var(--ivory-dim);
+    padding:9px 16px;
+    border-radius:20px;
+    font-family:'Inter',sans-serif;
+    font-size:0.9rem;
+    cursor:pointer;
+  }
+  .type-btn:hover{ color:var(--ivory); }
+  .type-btn.selected{
+    background:var(--brass);
+    border-color:var(--brass);
+    color:#151B33;
+    font-weight:600;
+  }
+
+  .chord-result{
+    background:var(--espresso);
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:22px;
+  }
+  .chord-result .name{
+    font-family:'Fraunces',serif;
+    font-size:1.8rem;
+    margin-bottom:4px;
+  }
+  .chord-result .formula{
+    color:var(--brass);
+    font-size:0.88rem;
+    margin-bottom:14px;
+  }
+  .note-chip-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .note-chip{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:8px;
+    padding:10px 14px;
+    text-align:center;
+    min-width:60px;
+  }
+  .note-chip .note{ font-weight:600; font-size:1.1rem; }
+  .note-chip .role{ font-size:0.72rem; color:var(--ivory-dim); margin-top:2px; }
+  .chord-result .explain{ color:var(--ivory-dim); font-size:0.92rem; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="hero">
+    <h1>Chordata</h1>
+    <p>Every major key, its seven built-in chords, a way to transpose between keys, and the recipe behind every chord shape.</p>
+  </header>
+
+  <p class="loading-banner">Loading the grand piano…</p>
+
+  <main>
+
+    <section class="panel" id="explorer">
+      <h2>Pick a key</h2>
+      <p class="hint">Tap a note to see the seven chords that live inside its major key — tap any chord to hear it played.</p>
+      <div class="piano" id="explorerPiano"></div>
+      <div class="chord-table" id="explorerTable"></div>
+    </section>
+
+    <section class="panel" id="transposer">
+      <h2>Transpose a key</h2>
+      <p class="hint">Move every chord in a key up or down to a new key, in one step.</p>
+      <div class="transpose-controls">
+        <label>From
+          <select id="fromKey"></select>
+        </label>
+        <div class="shift-label" id="shiftLabel"></div>
+        <label>To
+          <select id="toKey"></select>
+        </label>
+      </div>
+      <div class="transpose-tables">
+        <div>
+          <h3 id="fromLabel"></h3>
+          <div class="chord-table" id="fromTable"></div>
+        </div>
+        <div>
+          <h3 id="toLabel"></h3>
+          <div class="chord-table" id="toTable"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="builder">
+      <h2>Build a chord</h2>
+      <p class="hint">Pick a root note and a chord type to see exactly which notes make it up, and why.</p>
+      <div class="piano" id="builderPiano"></div>
+      <div class="chord-types" id="chordTypes"></div>
+      <div class="chord-result" id="chordResult"></div>
+    </section>
+
+  </main>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<script>
+/* ============================================================
+   MUSIC THEORY CORE
+   Everything below works from one idea: the 12 notes repeat in
+   a cycle, and every scale or chord is just a pattern of steps
+   (semitones) measured from a root note.
+   ============================================================ */
+
+const NOTES = ["A","A#","B","C","C#","D","D#","E","F","F#","G","G#"];
+
+// Steps (in semitones) from the root that make up a major scale.
+const MAJOR_SCALE_STEPS = [0,2,4,5,7,9,11];
+
+// A major scale's 7 chords are always in this order of quality:
+// I(major) ii(minor) iii(minor) IV(major) V(major) vi(minor) vii(diminished)
+const DEGREE_QUALITIES = ["major","minor","minor","major","major","minor","dim"];
+const DEGREE_NUMERALS  = ["I","ii","iii","IV","V","vi","vii°"];
+
+// Every chord type, defined as semitone offsets from its root.
+// The note at each offset is described using its scale-degree name
+// (3rd, flat 3rd, 5th, flat 7th...) rather than raw semitone counts —
+// that's how musicians actually talk about how a chord is built.
+const CHORD_TYPES = {
+  major:  { suffix:"",     label:"Major",         group:"triad",  intervals:[0,4,7] },
+  minor:  { suffix:"m",    label:"Minor",         group:"triad",  intervals:[0,3,7] },
+  dim:    { suffix:"°",    label:"Diminished",    group:"triad",  intervals:[0,3,6] },
+  aug:    { suffix:"+",    label:"Augmented",     group:"triad",  intervals:[0,4,8] },
+  sus2:   { suffix:"sus2", label:"Sus2",          group:"triad",  intervals:[0,2,7] },
+  sus4:   { suffix:"sus4", label:"Sus4",          group:"triad",  intervals:[0,5,7] },
+  maj7:   { suffix:"maj7", label:"Major 7th",     group:"extended", intervals:[0,4,7,11] },
+  dom7:   { suffix:"7",    label:"Dominant 7th",  group:"extended", intervals:[0,4,7,10] },
+  min7:   { suffix:"m7",   label:"Minor 7th",     group:"extended", intervals:[0,3,7,10] },
+  maj9:   { suffix:"maj9", label:"Major 9th",     group:"extended", intervals:[0,4,7,11,14] },
+  dom9:   { suffix:"9",    label:"Dominant 9th",  group:"extended", intervals:[0,4,7,10,14] },
+  min9:   { suffix:"m9",   label:"Minor 9th",     group:"extended", intervals:[0,3,7,10,14] },
+};
+
+// How each semitone offset from the root is named as a scale degree.
+const DEGREE_LABELS = {
+  0:"Root", 2:"2nd", 3:"♭3rd", 4:"3rd", 5:"4th", 6:"♭5th", 7:"5th",
+  8:"♯5th", 9:"6th", 10:"♭7th", 11:"7th", 13:"♭9th", 14:"9th", 15:"♯9th"
+};
+
+function degreeName(offset){
+  return DEGREE_LABELS[offset] || (offset + " semitones");
+}
+
+// Joins a list like ["3rd","5th","♭7th"] into "3rd, 5th, and flat 7th".
+function listJoin(arr){
+  if(arr.length === 0) return "";
+  if(arr.length === 1) return arr[0];
+  if(arr.length === 2) return arr[0] + " and " + arr[1];
+  return arr.slice(0,-1).join(", ") + ", and " + arr[arr.length - 1];
+}
+
+const INTERVAL_NAMES = ["Unison","Minor 2nd","Major 2nd","Minor 3rd","Major 3rd","Perfect 4th",
+  "Tritone","Perfect 5th","Minor 6th","Major 6th","Minor 7th","Major 7th"];
+
+function noteAt(rootIndex, semitoneOffset){
+  return NOTES[(rootIndex + semitoneOffset + 120) % 12];
+}
+
+// Returns the 7 diatonic chords of a major key, given its root index.
+function getKeyChords(rootIndex){
+  return MAJOR_SCALE_STEPS.map((step, i) => {
+    const degreeRoot = (rootIndex + step) % 12;
+    const quality = DEGREE_QUALITIES[i];
+    const type = CHORD_TYPES[quality === "dim" ? "dim" : quality];
+    const notes = type.intervals.map(off => noteAt(degreeRoot, off));
+    return {
+      numeral: DEGREE_NUMERALS[i],
+      name: NOTES[degreeRoot] + type.suffix,
+      notes,
+      quality,
+      rootIndex: degreeRoot,
+      typeKey: quality === "dim" ? "dim" : quality
+    };
+  });
+}
+
+function buildChord(rootIndex, typeKey){
+  const type = CHORD_TYPES[typeKey];
+  const notes = type.intervals.map(off => noteAt(rootIndex, off));
+  return { name: NOTES[rootIndex] + type.suffix, type, notes };
+}
+
+/* ============================================================
+   SOUND
+   A real grand piano, sampled (the Salamander Grand Piano set,
+   played back through Tone.js). If that library can't load —
+   no internet, a blocked CDN — everything still works, just with
+   a simple synth tone standing in.
+   ============================================================ */
+
+const MIDI_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function midiToNoteName(midi){
+  return MIDI_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+
+// A4 = MIDI note 69. NOTES is already ordered as semitone offsets
+// upward from A, so NOTES.indexOf(note) doubles as that offset.
+function noteMidi(note, octaveUp){
+  return 69 + NOTES.indexOf(note) + (octaveUp ? 12 : 0);
+}
+
+const hasTone = typeof Tone !== "undefined";
+let pianoReady = false;
+let pianoStarted = false;
+
+if(hasTone){
+  document.body.classList.add("piano-loading");
+  // Safety net: don't leave the UI locked if the samples never finish loading.
+  setTimeout(() => document.body.classList.remove("piano-loading"), 8000);
+}
+
+const piano = hasTone ? new Tone.Sampler({
+  urls: {
+    A0:"A0.mp3", C1:"C1.mp3", "D#1":"Ds1.mp3", "F#1":"Fs1.mp3",
+    A1:"A1.mp3", C2:"C2.mp3", "D#2":"Ds2.mp3", "F#2":"Fs2.mp3",
+    A2:"A2.mp3", C3:"C3.mp3", "D#3":"Ds3.mp3", "F#3":"Fs3.mp3",
+    A3:"A3.mp3", C4:"C4.mp3", "D#4":"Ds4.mp3", "F#4":"Fs4.mp3",
+    A4:"A4.mp3", C5:"C5.mp3", "D#5":"Ds5.mp3", "F#5":"Fs5.mp3",
+    A5:"A5.mp3", C6:"C6.mp3", "D#6":"Ds6.mp3", "F#6":"Fs6.mp3",
+    A6:"A6.mp3", C7:"C7.mp3", "D#7":"Ds7.mp3", "F#7":"Fs7.mp3",
+    A7:"A7.mp3", C8:"C8.mp3"
+  },
+  release: 1,
+  baseUrl: "https://tonejs.github.io/audio/salamander/",
+  onload: () => {
+    pianoReady = true;
+    document.body.classList.remove("piano-loading");
+  }
+}).toDestination() : null;
+
+// ---- fallback synth, only used if the piano samples aren't available ----
+let fallbackCtx = null;
+function getFallbackCtx(){
+  if(!fallbackCtx) fallbackCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(fallbackCtx.state === "suspended") fallbackCtx.resume();
+  return fallbackCtx;
+}
+function fallbackTone(freq, startTime, ctx){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "triangle";
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.22, startTime + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 1.1);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + 1.2);
+}
+
+// Plays one note by name. octaveUp distinguishes the piano's trailing
+// "A" key from the one at the start of the row.
+async function playNote(note, octaveUp){
+  if(hasTone){
+    if(!pianoStarted){ await Tone.start(); pianoStarted = true; }
+    if(pianoReady){
+      piano.triggerAttackRelease(midiToNoteName(noteMidi(note, octaveUp)), "2n");
+      return;
+    }
+  }
+  const ctx = getFallbackCtx();
+  const freq = 440 * Math.pow(2, (NOTES.indexOf(note) + (octaveUp ? 12 : 0)) / 12);
+  fallbackTone(freq, ctx.currentTime, ctx);
+}
+
+// Plays a full chord: a root index plus its interval offsets, so
+// notes always stack upward in pitch instead of wrapping downward.
+async function playChord(rootIndex, intervals){
+  if(hasTone){
+    if(!pianoStarted){ await Tone.start(); pianoStarted = true; }
+    if(pianoReady){
+      const rootMidi = 69 + rootIndex;
+      const now = Tone.now();
+      intervals.forEach((offset, i) => {
+        piano.triggerAttackRelease(midiToNoteName(rootMidi + offset), "1n", now + i * 0.03);
+      });
+      return;
+    }
+  }
+  const ctx = getFallbackCtx();
+  const now = ctx.currentTime;
+  const rootFreq = 440 * Math.pow(2, rootIndex / 12);
+  intervals.forEach((offset, i) => {
+    fallbackTone(rootFreq * Math.pow(2, offset / 12), now + i * 0.03, ctx);
+  });
+}
+
+/* ============================================================
+   PIANO SELECTOR (shared by the Key Explorer and Chord Builder)
+   ============================================================ */
+
+// Which notes are white keys, in left-to-right order starting on A.
+// The octave repeats, so a second "A" closes out the row.
+const WHITE_ORDER = ["A","B","C","D","E","F","G","A"];
+const BLACK_KEYS = [
+  { afterWhiteIndex:0, note:"A#" },
+  { afterWhiteIndex:2, note:"C#" },
+  { afterWhiteIndex:3, note:"D#" },
+  { afterWhiteIndex:5, note:"F#" },
+  { afterWhiteIndex:6, note:"G#" },
+];
+
+function renderPiano(containerId, selectedNote, onSelect){
+  const el = document.getElementById(containerId);
+  el.innerHTML = "";
+
+  WHITE_ORDER.forEach((note, i) => {
+    const isTrailing = i === WHITE_ORDER.length - 1;
+    const key = document.createElement("div");
+    key.className = "white-key" + (note === selectedNote ? " selected" : "");
+    key.textContent = note;
+    key.onclick = () => { playNote(note, isTrailing); onSelect(note); };
+    el.appendChild(key);
+  });
+
+  const whiteWidth = 100 / WHITE_ORDER.length;
+  BLACK_KEYS.forEach(({afterWhiteIndex, note}) => {
+    const key = document.createElement("div");
+    key.className = "black-key" + (note === selectedNote ? " selected" : "");
+    key.style.left = ((afterWhiteIndex + 1) * whiteWidth - whiteWidth * 0.3) + "%";
+    key.style.width = (whiteWidth * 0.6) + "%";
+    key.textContent = note.replace("#","♯");
+    key.onclick = (e) => { e.stopPropagation(); playNote(note, false); onSelect(note); };
+    el.appendChild(key);
+  });
+}
+
+/* ============================================================
+   SECTION 1 — KEY EXPLORER
+   ============================================================ */
+
+let explorerKey = "C";
+
+function renderExplorer(){
+  renderPiano("explorerPiano", explorerKey, note => {
+    explorerKey = note;
+    renderExplorer();
+  });
+
+  const chords = getKeyChords(NOTES.indexOf(explorerKey));
+  const table = document.getElementById("explorerTable");
+  table.innerHTML = rowsHTML(chords, true, true);
+}
+
+function rowsHTML(chords, withHeader, playable){
+  let html = "";
+  if(withHeader){
+    html += `<div class="chord-row head"><span></span><span>Chord</span><span>Notes</span><span></span></div>`;
+  }
+  chords.forEach(c => {
+    const rowClass = "chord-row" + (playable ? " playable" : "");
+    const clickAttr = playable ? ` onclick="playChord(${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals)"` : "";
+    html += `
+      <div class="${rowClass}"${clickAttr}>
+        <span class="degree">${c.numeral}</span>
+        <span class="chord-name">${c.name}</span>
+        <span class="chord-notes">${c.notes.join(" – ")}</span>
+        <span class="quality-tag ${c.quality}">${c.quality === "dim" ? "diminished" : c.quality}</span>
+      </div>`;
+  });
+  return html;
+}
+
+/* ============================================================
+   SECTION 2 — TRANSPOSER
+   ============================================================ */
+
+const fromSelect = document.getElementById("fromKey");
+const toSelect = document.getElementById("toKey");
+
+fromSelect.innerHTML = `<option value="" selected disabled>Pick a Key</option>`;
+toSelect.innerHTML = `<option value="" selected disabled>Pick a Key</option>`;
+NOTES.forEach(n => {
+  fromSelect.innerHTML += `<option value="${n}">${n} major</option>`;
+  toSelect.innerHTML += `<option value="${n}">${n} major</option>`;
+});
+
+function renderTransposer(){
+  const fromNote = fromSelect.value;
+  const toNote = toSelect.value;
+
+  if(!fromNote || !toNote){
+    document.getElementById("fromLabel").textContent = fromNote ? fromNote + " major" : "";
+    document.getElementById("toLabel").textContent = toNote ? toNote + " major" : "";
+    document.getElementById("fromTable").innerHTML = fromNote ? rowsHTML(getKeyChords(NOTES.indexOf(fromNote)), false) : "";
+    document.getElementById("toTable").innerHTML = toNote ? rowsHTML(getKeyChords(NOTES.indexOf(toNote)), false) : "";
+    document.getElementById("shiftLabel").textContent = "pick both keys";
+    return;
+  }
+
+  const fromIndex = NOTES.indexOf(fromNote);
+  const toIndex = NOTES.indexOf(toNote);
+  const shift = (toIndex - fromIndex + 12) % 12;
+
+  document.getElementById("fromLabel").textContent = fromNote + " major";
+  document.getElementById("toLabel").textContent = toNote + " major";
+  document.getElementById("fromTable").innerHTML = rowsHTML(getKeyChords(fromIndex), false);
+  document.getElementById("toTable").innerHTML = rowsHTML(getKeyChords(toIndex), false);
+
+  document.getElementById("shiftLabel").textContent = shift === 0
+    ? "same key"
+    : `up ${shift} semitone${shift === 1 ? "" : "s"} (${INTERVAL_NAMES[shift]})`;
+}
+
+fromSelect.onchange = renderTransposer;
+toSelect.onchange = renderTransposer;
+
+/* ============================================================
+   SECTION 3 — CHORD BUILDER
+   ============================================================ */
+
+let builderRoot = "C";
+let builderType = "major";
+
+function renderTypeButtons(){
+  const el = document.getElementById("chordTypes");
+  el.innerHTML = "";
+  ["triad","extended"].forEach(group => {
+    const row = document.createElement("div");
+    row.className = "type-row";
+    Object.entries(CHORD_TYPES).filter(([,t]) => t.group === group).forEach(([key, type]) => {
+      const btn = document.createElement("button");
+      btn.className = "type-btn" + (key === builderType ? " selected" : "");
+      btn.textContent = type.label;
+      btn.onclick = () => {
+        builderType = key;
+        renderBuilder();
+        playChord(NOTES.indexOf(builderRoot), type.intervals);
+      };
+      row.appendChild(btn);
+    });
+    el.appendChild(row);
+  });
+}
+
+function renderBuilder(){
+  renderPiano("builderPiano", builderRoot, note => {
+    builderRoot = note;
+    renderBuilder();
+  });
+  renderTypeButtons();
+
+  const rootIndex = NOTES.indexOf(builderRoot);
+  const chord = buildChord(rootIndex, builderType);
+  const type = CHORD_TYPES[builderType];
+  const roles = type.intervals.map(degreeName);
+
+  const chips = chord.notes.map((note, i) => `
+    <div class="note-chip">
+      <div class="note">${note}</div>
+      <div class="role">${roles[i]}</div>
+    </div>`).join("");
+
+  document.getElementById("chordResult").innerHTML = `
+    <div class="name">${chord.name}</div>
+    <div class="formula">${roles.join(" – ")}</div>
+    <div class="note-chip-row">${chips}</div>
+    <div class="explain">A ${type.label.toLowerCase()} chord is the root plus the ${listJoin(roles.slice(1))} of its scale. Stack those notes and you have it, on any instrument, in any key.</div>
+  `;
+}
+
+/* ============================================================
+   INITIAL RENDER
+   ============================================================ */
+
+renderExplorer();
+renderTransposer();
+renderBuilder();
+</script>
+
+</body>
+</html>
