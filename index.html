@@ -387,6 +387,14 @@ const MAJOR_SCALE_STEPS = [0,2,4,5,7,9,11];
 const DEGREE_QUALITIES = ["major","minor","minor","major","major","minor","dim"];
 const DEGREE_NUMERALS  = ["I","ii","iii","IV","V","vi","vii°"];
 
+// Steps (in semitones) from the root that make up a natural minor scale.
+const MINOR_SCALE_STEPS = [0,2,3,5,7,8,10];
+
+// A natural minor scale's 7 chords are always in this order of quality:
+// i(minor) ii(diminished) III(major) iv(minor) v(minor) VI(major) VII(major)
+const MINOR_DEGREE_QUALITIES = ["minor","dim","major","minor","minor","major","major"];
+const MINOR_DEGREE_NUMERALS  = ["i","ii°","III","iv","v","VI","VII"];
+
 // Every chord type, defined as semitone offsets from its root.
 // The note at each offset is described using its scale-degree name
 // (3rd, flat 3rd, 5th, flat 7th...) rather than raw semitone counts —
@@ -431,15 +439,19 @@ function noteAt(rootIndex, semitoneOffset){
   return NOTES[(rootIndex + semitoneOffset + 120) % 12];
 }
 
-// Returns the 7 diatonic chords of a major key, given its root index.
-function getKeyChords(rootIndex){
-  return MAJOR_SCALE_STEPS.map((step, i) => {
+// Returns the 7 diatonic chords of a key, given its root index and mode
+// ("major" or "minor").
+function getKeyChords(rootIndex, mode = "major"){
+  const steps = mode === "minor" ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+  const qualities = mode === "minor" ? MINOR_DEGREE_QUALITIES : DEGREE_QUALITIES;
+  const numerals = mode === "minor" ? MINOR_DEGREE_NUMERALS : DEGREE_NUMERALS;
+  return steps.map((step, i) => {
     const degreeRoot = (rootIndex + step) % 12;
-    const quality = DEGREE_QUALITIES[i];
+    const quality = qualities[i];
     const type = CHORD_TYPES[quality === "dim" ? "dim" : quality];
     const notes = type.intervals.map(off => noteAt(degreeRoot, off));
     return {
-      numeral: DEGREE_NUMERALS[i],
+      numeral: numerals[i],
       name: NOTES[degreeRoot] + type.suffix,
       notes,
       quality,
@@ -647,31 +659,39 @@ const toSelect = document.getElementById("toKey");
 fromSelect.innerHTML = `<option value="" selected disabled>Pick a Key</option>`;
 toSelect.innerHTML = `<option value="" selected disabled>Pick a Key</option>`;
 NOTES.forEach(n => {
-  fromSelect.innerHTML += `<option value="${n}">${n} major</option>`;
-  toSelect.innerHTML += `<option value="${n}">${n} major</option>`;
+  fromSelect.innerHTML += `<option value="${n}:major">${n} major</option>`;
+  toSelect.innerHTML += `<option value="${n}:major">${n} major</option>`;
+});
+NOTES.forEach(n => {
+  fromSelect.innerHTML += `<option value="${n}:minor">${n} minor</option>`;
+  toSelect.innerHTML += `<option value="${n}:minor">${n} minor</option>`;
 });
 
 function renderTransposer(){
-  const fromNote = fromSelect.value;
-  const toNote = toSelect.value;
+  const fromVal = fromSelect.value;
+  const toVal = toSelect.value;
 
-  if(!fromNote || !toNote){
-    document.getElementById("fromLabel").textContent = fromNote ? fromNote + " major" : "";
-    document.getElementById("toLabel").textContent = toNote ? toNote + " major" : "";
-    document.getElementById("fromTable").innerHTML = fromNote ? rowsHTML(getKeyChords(NOTES.indexOf(fromNote)), false) : "";
-    document.getElementById("toTable").innerHTML = toNote ? rowsHTML(getKeyChords(NOTES.indexOf(toNote)), false) : "";
+  if(!fromVal || !toVal){
+    const [fromNote, fromMode] = fromVal ? fromVal.split(":") : [null, null];
+    const [toNote, toMode] = toVal ? toVal.split(":") : [null, null];
+    document.getElementById("fromLabel").textContent = fromNote ? `${fromNote} ${fromMode}` : "";
+    document.getElementById("toLabel").textContent = toNote ? `${toNote} ${toMode}` : "";
+    document.getElementById("fromTable").innerHTML = fromNote ? rowsHTML(getKeyChords(NOTES.indexOf(fromNote), fromMode), false) : "";
+    document.getElementById("toTable").innerHTML = toNote ? rowsHTML(getKeyChords(NOTES.indexOf(toNote), toMode), false) : "";
     document.getElementById("shiftLabel").textContent = "pick both keys";
     return;
   }
 
+  const [fromNote, fromMode] = fromVal.split(":");
+  const [toNote, toMode] = toVal.split(":");
   const fromIndex = NOTES.indexOf(fromNote);
   const toIndex = NOTES.indexOf(toNote);
   const shift = (toIndex - fromIndex + 12) % 12;
 
-  document.getElementById("fromLabel").textContent = fromNote + " major";
-  document.getElementById("toLabel").textContent = toNote + " major";
-  document.getElementById("fromTable").innerHTML = rowsHTML(getKeyChords(fromIndex), false);
-  document.getElementById("toTable").innerHTML = rowsHTML(getKeyChords(toIndex), false);
+  document.getElementById("fromLabel").textContent = `${fromNote} ${fromMode}`;
+  document.getElementById("toLabel").textContent = `${toNote} ${toMode}`;
+  document.getElementById("fromTable").innerHTML = rowsHTML(getKeyChords(fromIndex, fromMode), false);
+  document.getElementById("toTable").innerHTML = rowsHTML(getKeyChords(toIndex, toMode), false);
 
   document.getElementById("shiftLabel").textContent = shift === 0
     ? "same key"
