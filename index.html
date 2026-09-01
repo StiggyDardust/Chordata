@@ -249,6 +249,19 @@
     min-width:150px;
     text-align:center;
   }
+  .reset-link{
+    display:block;
+    margin:14px auto 0;
+    background:none;
+    border:none;
+    color:var(--brass);
+    font-family:'Inter',sans-serif;
+    font-size:0.82rem;
+    text-decoration:underline;
+    cursor:pointer;
+    text-align:center;
+  }
+  .reset-link:hover{ color:var(--ivory); }
   .transpose-tables{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -360,6 +373,7 @@
           <select id="toKey"></select>
         </label>
       </div>
+      <button type="button" class="reset-link" id="resetTranspose">Reset selection</button>
       <div class="transpose-tables">
         <div>
           <h3 id="fromLabel"></h3>
@@ -453,6 +467,12 @@ const INTERVAL_NAMES = ["Unison","Minor 2nd","Major 2nd","Minor 3rd","Major 3rd"
 
 function noteAt(rootIndex, semitoneOffset){
   return NOTES[(rootIndex + semitoneOffset + 120) % 12];
+}
+
+// How a key's root is written without the words "major"/"minor" —
+// a bare note name for major (C), the note plus "m" for minor (Cm).
+function keyLabel(note, mode){
+  return mode === "minor" ? note + "m" : note;
 }
 
 // Returns the 7 diatonic chords of a key, given its root index and mode
@@ -678,10 +698,10 @@ const toSelect = document.getElementById("toKey");
 function populateKeySelect(selectEl, modeFilter){
   let html = `<option value="" selected disabled>Pick a Key</option>`;
   if(!modeFilter || modeFilter === "major"){
-    NOTES.forEach(n => { html += `<option value="${n}:major">${n} major</option>`; });
+    NOTES.forEach(n => { html += `<option value="${n}:major">${keyLabel(n, "major")}</option>`; });
   }
   if(!modeFilter || modeFilter === "minor"){
-    NOTES.forEach(n => { html += `<option value="${n}:minor">${n} minor</option>`; });
+    NOTES.forEach(n => { html += `<option value="${n}:minor">${keyLabel(n, "minor")}</option>`; });
   }
   selectEl.innerHTML = html;
 }
@@ -709,8 +729,8 @@ function renderTransposer(){
   if(!fromVal || !toVal){
     const [fromNote, fromMode] = fromVal ? fromVal.split(":") : [null, null];
     const [toNote, toMode] = toVal ? toVal.split(":") : [null, null];
-    document.getElementById("fromLabel").textContent = fromNote ? `${fromNote} ${fromMode}` : "";
-    document.getElementById("toLabel").textContent = toNote ? `${toNote} ${toMode}` : "";
+    document.getElementById("fromLabel").textContent = fromNote ? keyLabel(fromNote, fromMode) : "";
+    document.getElementById("toLabel").textContent = toNote ? keyLabel(toNote, toMode) : "";
     document.getElementById("fromTable").innerHTML = fromNote ? rowsHTML(getKeyChords(NOTES.indexOf(fromNote), fromMode), false) : "";
     document.getElementById("toTable").innerHTML = toNote ? rowsHTML(getKeyChords(NOTES.indexOf(toNote), toMode), false) : "";
     document.getElementById("shiftLabel").textContent = "pick both keys";
@@ -723,8 +743,8 @@ function renderTransposer(){
   const toIndex = NOTES.indexOf(toNote);
   const shift = (toIndex - fromIndex + 12) % 12;
 
-  document.getElementById("fromLabel").textContent = `${fromNote} ${fromMode}`;
-  document.getElementById("toLabel").textContent = `${toNote} ${toMode}`;
+  document.getElementById("fromLabel").textContent = keyLabel(fromNote, fromMode);
+  document.getElementById("toLabel").textContent = keyLabel(toNote, toMode);
   document.getElementById("fromTable").innerHTML = rowsHTML(getKeyChords(fromIndex, fromMode), false);
   document.getElementById("toTable").innerHTML = rowsHTML(getKeyChords(toIndex, toMode), false);
 
@@ -739,6 +759,15 @@ fromSelect.onchange = () => {
 };
 toSelect.onchange = () => {
   lockOtherToMode(toSelect, fromSelect);
+  renderTransposer();
+};
+
+// Clears both sides back to the full key list so any key can be picked again.
+document.getElementById("resetTranspose").onclick = () => {
+  populateKeySelect(fromSelect, null);
+  populateKeySelect(toSelect, null);
+  fromSelect.value = "";
+  toSelect.value = "";
   renderTransposer();
 };
 
