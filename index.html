@@ -133,6 +133,10 @@
     font-weight:600;
     box-shadow: inset 0 -3px 6px rgba(20,30,70,0.20), 0 0 0 2px rgba(124,156,232,0.35);
   }
+  .white-key.playing{
+    outline:3px solid var(--sage);
+    outline-offset:-3px;
+  }
 
   .black-key{
     position:absolute;
@@ -162,6 +166,10 @@
     color:#151B33;
     font-weight:600;
     box-shadow: 0 0 0 3px rgba(124,156,232,0.30), 0 4px 8px rgba(6,9,24,0.45);
+  }
+  .black-key.playing{
+    outline:2px solid var(--sage);
+    outline-offset:-2px;
   }
 
   /* ---------- chord table ---------- */
@@ -632,6 +640,7 @@ function renderPiano(containerId, selectedNote, onSelect){
     const isTrailing = i === WHITE_ORDER.length - 1;
     const key = document.createElement("div");
     key.className = "white-key" + (note === selectedNote ? " selected" : "");
+    key.dataset.note = note;
     key.textContent = note;
     key.onclick = () => { playNote(note, isTrailing); onSelect(note); };
     el.appendChild(key);
@@ -641,12 +650,28 @@ function renderPiano(containerId, selectedNote, onSelect){
   BLACK_KEYS.forEach(({afterWhiteIndex, note}) => {
     const key = document.createElement("div");
     key.className = "black-key" + (note === selectedNote ? " selected" : "");
+    key.dataset.note = note;
     key.style.left = ((afterWhiteIndex + 1) * whiteWidth - whiteWidth * 0.3) + "%";
     key.style.width = (whiteWidth * 0.6) + "%";
     key.textContent = note.replace("#","♯");
     key.onclick = (e) => { e.stopPropagation(); playNote(note, false); onSelect(note); };
     el.appendChild(key);
   });
+}
+
+// Lights up the keys of a piano that belong to a chord just played, then
+// clears the highlight after it's had time to be heard.
+function highlightChordKeys(containerId, rootIndex, intervals){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  container.querySelectorAll(".playing").forEach(el => el.classList.remove("playing"));
+  intervals.map(off => noteAt(rootIndex, off)).forEach(note => {
+    container.querySelectorAll(`[data-note="${note}"]`).forEach(el => el.classList.add("playing"));
+  });
+  clearTimeout(container._highlightTimer);
+  container._highlightTimer = setTimeout(() => {
+    container.querySelectorAll(".playing").forEach(el => el.classList.remove("playing"));
+  }, 1400);
 }
 
 /* ============================================================
@@ -674,7 +699,9 @@ function rowsHTML(chords, withHeader, playable, highlightIndex){
   }
   chords.forEach((c, i) => {
     const rowClass = "chord-row" + (playable ? " playable" : "") + (i === highlightIndex ? " relative-minor" : "");
-    const clickAttr = playable ? ` onclick="playChord(${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals)"` : "";
+    const clickAttr = playable
+      ? ` onclick="playChord(${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals); highlightChordKeys('explorerPiano', ${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals)"`
+      : "";
     html += `
       <div class="${rowClass}"${clickAttr}>
         <span class="degree">${c.numeral}</span>
@@ -792,6 +819,7 @@ function renderTypeButtons(){
         builderType = key;
         renderBuilder();
         playChord(NOTES.indexOf(builderRoot), type.intervals);
+        highlightChordKeys("builderPiano", NOTES.indexOf(builderRoot), type.intervals);
       };
       row.appendChild(btn);
     });
