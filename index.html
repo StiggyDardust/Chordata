@@ -70,10 +70,10 @@
     font-size:0.85rem;
     margin:0 0 28px;
   }
-  body.piano-loading .loading-banner{ display:block; }
-  body.piano-loading .piano,
-  body.piano-loading .type-btn,
-  body.piano-loading .chord-row.playable{
+  body.piano-loading[data-instrument="piano"] .loading-banner{ display:block; }
+  body.piano-loading[data-instrument="piano"] .piano,
+  body.piano-loading[data-instrument="piano"] .type-btn,
+  body.piano-loading[data-instrument="piano"] .chord-row.playable{
     opacity:0.5;
     pointer-events:none;
   }
@@ -97,7 +97,50 @@
     margin:0 0 22px;
   }
 
-  /* ---------- piano selector ---------- */
+  /* ---------- instrument selector ---------- */
+  .instrument-selector{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin:0 0 10px;
+  }
+  .instrument-btn{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    color:var(--ivory-dim);
+    padding:10px 18px;
+    border-radius:14px;
+    font-family:'Inter',sans-serif;
+    font-size:0.88rem;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+    line-height:1.2;
+  }
+  .instrument-btn .sub{
+    font-size:0.68rem;
+    color:var(--ivory-dim);
+    opacity:0.75;
+  }
+  .instrument-btn:hover{ color:var(--ivory); }
+  .instrument-btn.selected{
+    background:var(--brass);
+    border-color:var(--brass);
+    color:#151B33;
+    font-weight:600;
+  }
+  .instrument-btn.selected .sub{ color:#151B33; opacity:0.75; }
+  .instrument-hint{
+    text-align:center;
+    color:var(--ivory-dim);
+    font-size:0.82rem;
+    margin:0 0 32px;
+  }
+
+  /* ---------- piano visualizer ---------- */
   .piano{
     position:relative;
     height:132px;
@@ -180,6 +223,109 @@
     font-size:0.74rem;
     box-shadow: 0 0 0 3px var(--glow), 0 0 20px 6px rgba(255,209,102,0.9);
     z-index:3;
+  }
+
+  /* ---------- fretboard visualizer (guitar / bass) ---------- */
+  .fretboard-wrap{
+    overflow-x:auto;
+    margin-bottom:26px;
+    padding-bottom:4px;
+  }
+  .fretboard{
+    background:linear-gradient(180deg, #4A3527 0%, #2E2015 100%);
+    border-radius:12px;
+    padding:18px 14px 14px;
+    filter: drop-shadow(0 10px 18px rgba(6,9,24,0.35));
+    min-width:560px;
+  }
+  .fretboard-strings{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .fret-row{
+    position:relative;
+    display:grid;
+    grid-template-columns: repeat(13, minmax(30px, 1fr));
+    align-items:center;
+    height:28px;
+  }
+  .fret-row::before{
+    content:"";
+    position:absolute;
+    left:0; right:0; top:50%;
+    height:var(--string-h, 2px);
+    background:linear-gradient(90deg, #E4DECE, #B8AF9C);
+    transform:translateY(-50%);
+    z-index:1;
+    border-radius:2px;
+  }
+  .fret-cell{
+    position:relative;
+    height:100%;
+    z-index:2;
+  }
+  .fret-cell:not(:last-child){
+    border-right:1px solid rgba(255,255,255,0.18);
+  }
+  .fret-cell:first-child{
+    border-right:3px solid var(--ivory-dim);
+  }
+  .fret-cell.open::before{
+    content:attr(data-note);
+    position:absolute;
+    top:0; left:2px;
+    font-size:0.55rem;
+    color:var(--ivory-dim);
+    font-weight:600;
+    z-index:1;
+    pointer-events:none;
+  }
+  .fret-cell.marker::after{
+    content:"";
+    position:absolute;
+    top:50%; left:50%;
+    width:6px; height:6px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.14);
+    transform:translate(-50%,-50%);
+    z-index:1;
+  }
+  .fret-dot{
+    position:absolute;
+    inset:0;
+    margin:auto;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:0.6rem;
+    font-weight:700;
+    color:transparent;
+    background:transparent;
+    border:2px solid transparent;
+    opacity:0;
+    transform:scale(0.6);
+    transition:opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+    cursor:pointer;
+    z-index:3;
+  }
+  .fret-dot.selected{
+    opacity:1;
+    transform:scale(1);
+    background:var(--brass-dim);
+    border-color:var(--brass);
+    color:var(--brass);
+  }
+  .fret-dot.playing{
+    opacity:1 !important;
+    transform:scale(1.1) !important;
+    background:var(--glow) !important;
+    border-color:var(--glow) !important;
+    color:#1B2340 !important;
+    box-shadow:0 0 16px 5px rgba(255,209,102,0.85);
   }
 
   /* ---------- chord table ---------- */
@@ -370,12 +516,19 @@
 
   <p class="loading-banner">Loading the grand piano…</p>
 
+  <div class="instrument-selector" id="instrumentSelector">
+    <button type="button" class="instrument-btn selected" data-instrument="piano">Grand Piano</button>
+    <button type="button" class="instrument-btn" data-instrument="guitar">Guitar<span class="sub">6-String Standard</span></button>
+    <button type="button" class="instrument-btn" data-instrument="bass">Bass<span class="sub">4-String Standard</span></button>
+  </div>
+  <p class="instrument-hint">Piano plays block chords, guitar strums, bass plucks each note in turn.</p>
+
   <main>
 
     <section class="panel" id="explorer">
       <h2>Pick a key</h2>
       <p class="hint">Tap a note to see the seven chords that live inside its major key — tap any chord to hear it played. The circled chord is the relative minor.</p>
-      <div class="piano" id="explorerPiano"></div>
+      <div id="explorerPiano"></div>
       <div class="chord-table" id="explorerTable"></div>
     </section>
 
@@ -407,7 +560,7 @@
     <section class="panel" id="builder">
       <h2>Build a chord</h2>
       <p class="hint">Pick a root note and a chord type to see exactly which notes make it up, and why.</p>
-      <div class="piano" id="builderPiano"></div>
+      <div id="builderPiano"></div>
       <div class="chord-types" id="chordTypes"></div>
       <div class="chord-result" id="chordResult"></div>
     </section>
@@ -522,11 +675,46 @@ function buildChord(rootIndex, typeKey){
 }
 
 /* ============================================================
+   INSTRUMENTS
+   Which instrument's visualizer/audio is currently active, and the
+   physical facts each one needs: string tunings and an octave shift
+   so guitar and bass sit in a lower, more natural register than piano.
+   ============================================================ */
+
+let currentInstrument = "piano";
+
+// Open-string notes, low string to high string (standard tuning).
+const GUITAR_TUNING = ["E","A","D","G","B","E"];
+const BASS_TUNING = ["E","A","D","G"];
+const FRET_COUNT = 12;
+
+// Semitones to shift playback by so each instrument sits in a register
+// that sounds like itself, rather than everything living at piano pitch.
+const INSTRUMENT_OCTAVE_OFFSET = { piano:0, guitar:-12, bass:-24 };
+
+function setInstrument(instrument){
+  currentInstrument = instrument;
+  document.body.dataset.instrument = instrument;
+  document.querySelectorAll(".instrument-btn").forEach(btn => {
+    btn.classList.toggle("selected", btn.dataset.instrument === instrument);
+  });
+  renderExplorer();
+  renderBuilder();
+}
+
+document.querySelectorAll(".instrument-btn").forEach(btn => {
+  btn.onclick = () => setInstrument(btn.dataset.instrument);
+});
+document.body.dataset.instrument = currentInstrument;
+
+/* ============================================================
    SOUND
    A real grand piano, sampled (the Salamander Grand Piano set,
    played back through Tone.js). If that library can't load —
    no internet, a blocked CDN — everything still works, just with
-   a simple synth tone standing in.
+   a simple synth tone standing in. Guitar and bass use Tone's
+   built-in plucked-string synthesis (Karplus-Strong), so they need
+   no extra samples and are ready to play instantly.
    ============================================================ */
 
 const MIDI_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -542,7 +730,7 @@ function noteMidi(note, octaveUp){
 
 const hasTone = typeof Tone !== "undefined";
 let pianoReady = false;
-let pianoStarted = false;
+let audioStarted = false;
 
 if(hasTone){
   document.body.classList.add("piano-loading");
@@ -569,7 +757,33 @@ const piano = hasTone ? new Tone.Sampler({
   }
 }).toDestination() : null;
 
-// ---- fallback synth, only used if the piano samples aren't available ----
+// A small pool of plucked-string voices per instrument, reused round-robin
+// so a strummed or arpeggiated chord's overlapping notes don't cut each other off.
+function createPluckPool(size){
+  const pool = [];
+  for(let i=0;i<size;i++){
+    pool.push(new Tone.PluckSynth({ attackNoise:1, dampening:4000, resonance:0.92 }).toDestination());
+  }
+  return pool;
+}
+let guitarPool = null;
+let bassPool = null;
+function ensureGuitarPool(){
+  if(!guitarPool) guitarPool = createPluckPool(6);
+  return guitarPool;
+}
+function ensureBassPool(){
+  if(!bassPool) bassPool = createPluckPool(4);
+  return bassPool;
+}
+function nextVoice(pool){
+  pool._i = (pool._i || 0) % pool.length;
+  const voice = pool[pool._i];
+  pool._i++;
+  return voice;
+}
+
+// ---- fallback synth, only used if Tone.js isn't available ----
 let fallbackCtx = null;
 function getFallbackCtx(){
   if(!fallbackCtx) fallbackCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -590,34 +804,53 @@ function fallbackTone(freq, startTime, ctx){
   osc.stop(startTime + 1.2);
 }
 
-// Plays one note by name. octaveUp distinguishes the piano's trailing
-// "A" key from the one at the start of the row.
+async function ensureAudioStarted(){
+  if(hasTone && !audioStarted){ await Tone.start(); audioStarted = true; }
+}
+
+// Plays one note by name on the grand piano. octaveUp distinguishes the
+// piano's trailing "A" key from the one at the start of the row.
 async function playNote(note, octaveUp){
-  if(hasTone){
-    if(!pianoStarted){ await Tone.start(); pianoStarted = true; }
-    if(pianoReady){
-      piano.triggerAttackRelease(midiToNoteName(noteMidi(note, octaveUp)), "2n");
-      return;
-    }
+  await ensureAudioStarted();
+  if(hasTone && pianoReady){
+    piano.triggerAttackRelease(midiToNoteName(noteMidi(note, octaveUp)), "2n");
+    return;
   }
   const ctx = getFallbackCtx();
   const freq = 440 * Math.pow(2, (NOTES.indexOf(note) + (octaveUp ? 12 : 0)) / 12);
   fallbackTone(freq, ctx.currentTime, ctx);
 }
 
-// Plays a full chord: a root index plus its interval offsets, so
-// notes always stack upward in pitch instead of wrapping downward.
-async function playChord(rootIndex, intervals){
+// Plays one note on whichever instrument is currently selected — used when
+// tapping a note directly on the piano keys or the fretboard.
+async function playInstrumentNote(note, octaveUp){
+  if(currentInstrument === "piano"){
+    return playNote(note, octaveUp);
+  }
+  await ensureAudioStarted();
+  const offset = INSTRUMENT_OCTAVE_OFFSET[currentInstrument] || 0;
   if(hasTone){
-    if(!pianoStarted){ await Tone.start(); pianoStarted = true; }
-    if(pianoReady){
-      const rootMidi = 69 + rootIndex;
-      const now = Tone.now();
-      intervals.forEach((offset, i) => {
-        piano.triggerAttackRelease(midiToNoteName(rootMidi + offset), "1n", now + i * 0.03);
-      });
-      return;
-    }
+    const pool = currentInstrument === "bass" ? ensureBassPool() : ensureGuitarPool();
+    nextVoice(pool).triggerAttack(midiToNoteName(noteMidi(note, octaveUp) + offset));
+    return;
+  }
+  const ctx = getFallbackCtx();
+  const freq = 440 * Math.pow(2, (NOTES.indexOf(note) + (octaveUp ? 12 : 0) + offset) / 12);
+  fallbackTone(freq, ctx.currentTime, ctx);
+}
+
+// Plays a full chord as a block on the grand piano: a root index plus its
+// interval offsets, so notes always stack upward in pitch instead of
+// wrapping downward.
+async function playChord(rootIndex, intervals){
+  await ensureAudioStarted();
+  if(hasTone && pianoReady){
+    const rootMidi = 69 + rootIndex;
+    const now = Tone.now();
+    intervals.forEach((offset, i) => {
+      piano.triggerAttackRelease(midiToNoteName(rootMidi + offset), "1n", now + i * 0.03);
+    });
+    return;
   }
   const ctx = getFallbackCtx();
   const now = ctx.currentTime;
@@ -627,8 +860,60 @@ async function playChord(rootIndex, intervals){
   });
 }
 
+// Strums a chord on guitar: every note fires almost simultaneously, each
+// just a beat behind the last, so they ring out together like a real strum.
+async function strumChord(rootIndex, intervals){
+  await ensureAudioStarted();
+  const offset = INSTRUMENT_OCTAVE_OFFSET.guitar;
+  if(hasTone){
+    const pool = ensureGuitarPool();
+    const now = Tone.now();
+    intervals.forEach((iv, i) => {
+      nextVoice(pool).triggerAttack(midiToNoteName(69 + rootIndex + iv + offset), now + i * 0.045);
+    });
+    return;
+  }
+  const ctx = getFallbackCtx();
+  const now = ctx.currentTime;
+  const rootFreq = 440 * Math.pow(2, (rootIndex + offset) / 12);
+  intervals.forEach((iv, i) => {
+    fallbackTone(rootFreq * Math.pow(2, iv / 12), now + i * 0.045, ctx);
+  });
+}
+
+// Plucks a chord on bass one note at a time — root, then third, then fifth,
+// and so on — letting each note ring out clearly before the next.
+async function arpeggiateChord(rootIndex, intervals){
+  await ensureAudioStarted();
+  const offset = INSTRUMENT_OCTAVE_OFFSET.bass;
+  if(hasTone){
+    const pool = ensureBassPool();
+    const now = Tone.now();
+    intervals.forEach((iv, i) => {
+      nextVoice(pool).triggerAttack(midiToNoteName(69 + rootIndex + iv + offset), now + i * 0.24);
+    });
+    return;
+  }
+  const ctx = getFallbackCtx();
+  const now = ctx.currentTime;
+  const rootFreq = 440 * Math.pow(2, (rootIndex + offset) / 12);
+  intervals.forEach((iv, i) => {
+    fallbackTone(rootFreq * Math.pow(2, iv / 12), now + i * 0.24, ctx);
+  });
+}
+
+// Plays a chord using whichever instrument is currently selected: a block
+// chord on piano, a strum on guitar, or a plucked arpeggio on bass.
+function playInstrumentChord(rootIndex, intervals){
+  if(currentInstrument === "guitar") return strumChord(rootIndex, intervals);
+  if(currentInstrument === "bass") return arpeggiateChord(rootIndex, intervals);
+  return playChord(rootIndex, intervals);
+}
+
 /* ============================================================
-   PIANO SELECTOR (shared by the Key Explorer and Chord Builder)
+   INSTRUMENT VISUALIZERS
+   Piano keys or a fretboard, shared by the Key Explorer and the
+   Chord Builder. Which one renders depends on currentInstrument.
    ============================================================ */
 
 // Which notes are white keys, in left-to-right order starting on A.
@@ -644,6 +929,7 @@ const BLACK_KEYS = [
 
 function renderPiano(containerId, selectedNote, onSelect){
   const el = document.getElementById(containerId);
+  el.className = "piano";
   el.innerHTML = "";
 
   WHITE_ORDER.forEach((note, i) => {
@@ -669,8 +955,66 @@ function renderPiano(containerId, selectedNote, onSelect){
   });
 }
 
-// Lights up the keys of a piano that belong to a chord just played, then
-// clears the highlight after it's had time to be heard.
+// The note sounding at a given fret on a string that opens on openNote.
+function fretNote(openNote, fret){
+  return noteAt(NOTES.indexOf(openNote), fret);
+}
+
+function renderFretboard(containerId, instrument, selectedNote, onSelect){
+  const el = document.getElementById(containerId);
+  el.className = "fretboard-wrap";
+  el.innerHTML = "";
+
+  const tuning = instrument === "bass" ? BASS_TUNING : GUITAR_TUNING;
+  // Drawn high string at top, low string at bottom — same order guitar tab uses.
+  const strings = [...tuning].reverse();
+
+  const board = document.createElement("div");
+  board.className = "fretboard";
+  const rows = document.createElement("div");
+  rows.className = "fretboard-strings";
+
+  strings.forEach((openNote, stringIndex) => {
+    const row = document.createElement("div");
+    row.className = "fret-row";
+    // Lower strings are drawn slightly thicker, like a real set of strings.
+    const thickness = 1.5 + (stringIndex / (strings.length - 1)) * 2.5;
+    row.style.setProperty("--string-h", thickness.toFixed(1) + "px");
+
+    for(let fret = 0; fret <= FRET_COUNT; fret++){
+      const note = fretNote(openNote, fret);
+      const cell = document.createElement("div");
+      cell.className = "fret-cell" + (fret === 0 ? " open" : "") + ([3,5,7,9,12].includes(fret) ? " marker" : "");
+      if(fret === 0) cell.dataset.note = note; // read by .open::before to label the open string
+
+      const dot = document.createElement("div");
+      dot.className = "fret-dot" + (note === selectedNote ? " selected" : "");
+      dot.dataset.note = note;
+      dot.textContent = note;
+      dot.onclick = (e) => { e.stopPropagation(); playInstrumentNote(note, false); onSelect(note); };
+
+      cell.appendChild(dot);
+      row.appendChild(cell);
+    }
+    rows.appendChild(row);
+  });
+
+  board.appendChild(rows);
+  el.appendChild(board);
+}
+
+// Shows the piano or the fretboard, whichever matches currentInstrument.
+function renderInstrumentDisplay(containerId, selectedNote, onSelect){
+  if(currentInstrument === "piano"){
+    renderPiano(containerId, selectedNote, onSelect);
+  } else {
+    renderFretboard(containerId, currentInstrument, selectedNote, onSelect);
+  }
+}
+
+// Lights up the notes of a chord just played — piano keys or fretboard
+// dots, both tagged with data-note — then clears the highlight after
+// it's had time to be heard.
 function highlightChordKeys(containerId, rootIndex, intervals){
   const container = document.getElementById(containerId);
   if(!container) return;
@@ -691,7 +1035,7 @@ function highlightChordKeys(containerId, rootIndex, intervals){
 let explorerKey = "C";
 
 function renderExplorer(){
-  renderPiano("explorerPiano", explorerKey, note => {
+  renderInstrumentDisplay("explorerPiano", explorerKey, note => {
     explorerKey = note;
     renderExplorer();
   });
@@ -710,7 +1054,7 @@ function rowsHTML(chords, withHeader, playable, highlightIndex){
   chords.forEach((c, i) => {
     const rowClass = "chord-row" + (playable ? " playable" : "") + (i === highlightIndex ? " relative-minor" : "");
     const clickAttr = playable
-      ? ` onclick="playChord(${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals); highlightChordKeys('explorerPiano', ${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals)"`
+      ? ` onclick="playInstrumentChord(${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals); highlightChordKeys('explorerPiano', ${c.rootIndex}, CHORD_TYPES['${c.typeKey}'].intervals)"`
       : "";
     html += `
       <div class="${rowClass}"${clickAttr}>
@@ -828,7 +1172,7 @@ function renderTypeButtons(){
       btn.onclick = () => {
         builderType = key;
         renderBuilder();
-        playChord(NOTES.indexOf(builderRoot), type.intervals);
+        playInstrumentChord(NOTES.indexOf(builderRoot), type.intervals);
         highlightChordKeys("builderPiano", NOTES.indexOf(builderRoot), type.intervals);
       };
       row.appendChild(btn);
@@ -838,7 +1182,7 @@ function renderTypeButtons(){
 }
 
 function renderBuilder(){
-  renderPiano("builderPiano", builderRoot, note => {
+  renderInstrumentDisplay("builderPiano", builderRoot, note => {
     builderRoot = note;
     renderBuilder();
   });
