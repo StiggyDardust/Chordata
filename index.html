@@ -315,17 +315,18 @@
   .fret-dot.selected{
     opacity:1;
     transform:scale(1);
-    background:var(--brass-dim);
-    border-color:var(--brass);
-    color:var(--brass);
+    background:#FFFFFF;
+    border-color:#FFFFFF;
+    color:#1B2340;
+    box-shadow:0 0 10px 3px rgba(255,255,255,0.65), 0 0 2px 1px rgba(255,255,255,0.9);
   }
   .fret-dot.playing{
     opacity:1 !important;
-    transform:scale(1.1) !important;
+    transform:scale(1.12) !important;
     background:var(--glow) !important;
     border-color:var(--glow) !important;
     color:#1B2340 !important;
-    box-shadow:0 0 16px 5px rgba(255,209,102,0.85);
+    box-shadow:0 0 18px 6px rgba(255,209,102,0.9), 0 0 3px 1px rgba(255,209,102,1);
   }
 
   /* ---------- chord table ---------- */
@@ -712,9 +713,9 @@ document.body.dataset.instrument = currentInstrument;
    A real grand piano, sampled (the Salamander Grand Piano set,
    played back through Tone.js). If that library can't load —
    no internet, a blocked CDN — everything still works, just with
-   a simple synth tone standing in. Guitar and bass use Tone's
-   built-in plucked-string synthesis (Karplus-Strong), so they need
-   no extra samples and are ready to play instantly.
+   a simple synth tone standing in. Guitar and bass are dedicated
+   Web Audio synth voices (oscillator + low-pass filter) instead of
+   piano samples, each shaped and pitched to sound like itself.
    ============================================================ */
 
 const MIDI_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -757,23 +758,31 @@ const piano = hasTone ? new Tone.Sampler({
   }
 }).toDestination() : null;
 
-// A small pool of plucked-string voices per instrument, reused round-robin
-// so a strummed or arpeggiated chord's overlapping notes don't cut each other off.
-function createPluckPool(size){
+// A small pool of dedicated synth voices per instrument, reused round-robin
+// so a strummed or arpeggiated chord's overlapping notes don't cut each
+// other off. Each voice is its own oscillator through a low-pass filter —
+// warm sawtooth for guitar, round sine/triangle for bass — not the piano.
+function createFilteredSynthPool(size, oscType, filterFreq, envelope){
+  const filter = new Tone.Filter(filterFreq, "lowpass").toDestination();
   const pool = [];
   for(let i=0;i<size;i++){
-    pool.push(new Tone.PluckSynth({ attackNoise:1, dampening:4000, resonance:0.92 }).toDestination());
+    pool.push(new Tone.Synth({ oscillator:{ type:oscType }, envelope }).connect(filter));
   }
   return pool;
 }
 let guitarPool = null;
 let bassPool = null;
 function ensureGuitarPool(){
-  if(!guitarPool) guitarPool = createPluckPool(6);
+  // Sawtooth for harmonic richness, tamed by a low-pass filter into a
+  // warm, string-like tone instead of a harsh buzz.
+  if(!guitarPool) guitarPool = createFilteredSynthPool(6, "sawtooth", 2200,
+    { attack:0.004, decay:0.35, sustain:0.12, release:1.1 });
   return guitarPool;
 }
 function ensureBassPool(){
-  if(!bassPool) bassPool = createPluckPool(4);
+  // Triangle for a clean, round low end without the thinness of a pure sine.
+  if(!bassPool) bassPool = createFilteredSynthPool(4, "triangle", 500,
+    { attack:0.012, decay:0.4, sustain:0.5, release:0.9 });
   return bassPool;
 }
 function nextVoice(pool){
@@ -784,24 +793,41 @@ function nextVoice(pool){
 }
 
 // ---- fallback synth, only used if Tone.js isn't available ----
+// Still real Web Audio API (an OscillatorNode into a GainNode), just built
+// by hand rather than through Tone.js. Guitar/bass pass their own oscillator
+// type and low-pass filter so they don't fall back to sounding like piano.
 let fallbackCtx = null;
 function getFallbackCtx(){
   if(!fallbackCtx) fallbackCtx = new (window.AudioContext || window.webkitAudioContext)();
   if(fallbackCtx.state === "suspended") fallbackCtx.resume();
   return fallbackCtx;
 }
-function fallbackTone(freq, startTime, ctx){
+const FALLBACK_TONE_OPTS = {
+  piano:  { type:"triangle", filterFreq:null, peak:0.22, decayTime:1.1, stopTime:1.2 },
+  guitar: { type:"sawtooth", filterFreq:2200, peak:0.16, decayTime:1.0, stopTime:1.05 },
+  bass:   { type:"triangle", filterFreq:500,  peak:0.26, decayTime:1.3, stopTime:1.4 }
+};
+function fallbackTone(freq, startTime, ctx, opts){
+  const { type, filterFreq, peak, decayTime, stopTime } = opts || FALLBACK_TONE_OPTS.piano;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.type = "triangle";
+  osc.type = type;
   osc.frequency.value = freq;
   gain.gain.setValueAtTime(0, startTime);
-  gain.gain.linearRampToValueAtTime(0.22, startTime + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 1.1);
-  osc.connect(gain);
+  gain.gain.linearRampToValueAtTime(peak, startTime + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
+  if(filterFreq){
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = filterFreq;
+    osc.connect(filter);
+    filter.connect(gain);
+  } else {
+    osc.connect(gain);
+  }
   gain.connect(ctx.destination);
   osc.start(startTime);
-  osc.stop(startTime + 1.2);
+  osc.stop(startTime + stopTime);
 }
 
 async function ensureAudioStarted(){
@@ -829,14 +855,15 @@ async function playInstrumentNote(note, octaveUp){
   }
   await ensureAudioStarted();
   const offset = INSTRUMENT_OCTAVE_OFFSET[currentInstrument] || 0;
+  const isBass = currentInstrument === "bass";
   if(hasTone){
-    const pool = currentInstrument === "bass" ? ensureBassPool() : ensureGuitarPool();
-    nextVoice(pool).triggerAttack(midiToNoteName(noteMidi(note, octaveUp) + offset));
+    const pool = isBass ? ensureBassPool() : ensureGuitarPool();
+    nextVoice(pool).triggerAttackRelease(midiToNoteName(noteMidi(note, octaveUp) + offset), isBass ? 1.1 : 0.8);
     return;
   }
   const ctx = getFallbackCtx();
   const freq = 440 * Math.pow(2, (NOTES.indexOf(note) + (octaveUp ? 12 : 0) + offset) / 12);
-  fallbackTone(freq, ctx.currentTime, ctx);
+  fallbackTone(freq, ctx.currentTime, ctx, FALLBACK_TONE_OPTS[currentInstrument]);
 }
 
 // Plays a full chord as a block on the grand piano: a root index plus its
@@ -861,7 +888,9 @@ async function playChord(rootIndex, intervals){
 }
 
 // Strums a chord on guitar: every note fires almost simultaneously, each
-// just a beat behind the last, so they ring out together like a real strum.
+// just a beat (30–50ms) behind the last, so they ring out together like a
+// real physical strum instead of a single synchronized block chord.
+const STRUM_STAGGER = 0.04;
 async function strumChord(rootIndex, intervals){
   await ensureAudioStarted();
   const offset = INSTRUMENT_OCTAVE_OFFSET.guitar;
@@ -869,7 +898,7 @@ async function strumChord(rootIndex, intervals){
     const pool = ensureGuitarPool();
     const now = Tone.now();
     intervals.forEach((iv, i) => {
-      nextVoice(pool).triggerAttack(midiToNoteName(69 + rootIndex + iv + offset), now + i * 0.045);
+      nextVoice(pool).triggerAttackRelease(midiToNoteName(69 + rootIndex + iv + offset), 1.0, now + i * STRUM_STAGGER);
     });
     return;
   }
@@ -877,12 +906,14 @@ async function strumChord(rootIndex, intervals){
   const now = ctx.currentTime;
   const rootFreq = 440 * Math.pow(2, (rootIndex + offset) / 12);
   intervals.forEach((iv, i) => {
-    fallbackTone(rootFreq * Math.pow(2, iv / 12), now + i * 0.045, ctx);
+    fallbackTone(rootFreq * Math.pow(2, iv / 12), now + i * STRUM_STAGGER, ctx, FALLBACK_TONE_OPTS.guitar);
   });
 }
 
 // Plucks a chord on bass one note at a time — root, then third, then fifth,
-// and so on — letting each note ring out clearly before the next.
+// and so on — spaced 200–300ms apart so each note rings out clearly before
+// the next, an octave or two below the piano/guitar register.
+const ARPEGGIO_STAGGER = 0.25;
 async function arpeggiateChord(rootIndex, intervals){
   await ensureAudioStarted();
   const offset = INSTRUMENT_OCTAVE_OFFSET.bass;
@@ -890,7 +921,7 @@ async function arpeggiateChord(rootIndex, intervals){
     const pool = ensureBassPool();
     const now = Tone.now();
     intervals.forEach((iv, i) => {
-      nextVoice(pool).triggerAttack(midiToNoteName(69 + rootIndex + iv + offset), now + i * 0.24);
+      nextVoice(pool).triggerAttackRelease(midiToNoteName(69 + rootIndex + iv + offset), 1.3, now + i * ARPEGGIO_STAGGER);
     });
     return;
   }
@@ -898,7 +929,7 @@ async function arpeggiateChord(rootIndex, intervals){
   const now = ctx.currentTime;
   const rootFreq = 440 * Math.pow(2, (rootIndex + offset) / 12);
   intervals.forEach((iv, i) => {
-    fallbackTone(rootFreq * Math.pow(2, iv / 12), now + i * 0.24, ctx);
+    fallbackTone(rootFreq * Math.pow(2, iv / 12), now + i * ARPEGGIO_STAGGER, ctx, FALLBACK_TONE_OPTS.bass);
   });
 }
 
