@@ -571,7 +571,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/nbrosowsky/tonejs-instruments@622c2f1c32c8cfce4158ddc3eb26e518ddef37e5/Tonejs-Instruments.js"></script>
 <script>
 /* ============================================================
    MUSIC THEORY CORE
@@ -761,23 +760,44 @@ const piano = hasTone ? new Tone.Sampler({
   }
 }).toDestination() : null;
 
-// Real acoustic guitar and electric bass recordings, loaded the same way
-// as the piano above (same nbrosowsky/tonejs-instruments sample set used
-// throughout the Tone.js community). SampleLibrary.load builds a ready
-// Tone.Sampler per instrument; we just point it at each destination.
-const hasSampleLibrary = typeof SampleLibrary !== "undefined";
-let guitarSampler = null;
-let bassSampler = null;
-if(hasTone && hasSampleLibrary){
-  const acousticSamples = SampleLibrary.load({
-    instruments: ["guitar-acoustic", "bass-electric"],
-    baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/"
-  });
-  guitarSampler = acousticSamples["guitar-acoustic"].toDestination();
-  guitarSampler.release = 1.0;
-  bassSampler = acousticSamples["bass-electric"].toDestination();
-  bassSampler.release = 1.2;
-}
+// Real acoustic guitar and electric bass recordings (nbrosowsky/tonejs-
+// instruments, CC-BY), loaded the exact same way as the piano above —
+// a plain Tone.Sampler with an explicit urls map — rather than through
+// that project's own SampleLibrary loader, whose default file-extension
+// handling left the sample URLs unresolved.
+let guitarReady = false;
+const guitarSampler = hasTone ? new Tone.Sampler({
+  urls: {
+    F4:"F4.mp3", "F#2":"Fs2.mp3", "F#3":"Fs3.mp3", "F#4":"Fs4.mp3",
+    G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3",
+    "G#2":"Gs2.mp3", "G#3":"Gs3.mp3", "G#4":"Gs4.mp3",
+    A2:"A2.mp3", A3:"A3.mp3", A4:"A4.mp3",
+    "A#2":"As2.mp3", "A#3":"As3.mp3", "A#4":"As4.mp3",
+    B2:"B2.mp3", B3:"B3.mp3", B4:"B4.mp3",
+    C3:"C3.mp3", C4:"C4.mp3", C5:"C5.mp3",
+    "C#3":"Cs3.mp3", "C#4":"Cs4.mp3", "C#5":"Cs5.mp3",
+    D2:"D2.mp3", D3:"D3.mp3", D4:"D4.mp3", D5:"D5.mp3",
+    "D#2":"Ds2.mp3", "D#3":"Ds3.mp3", "D#4":"Ds4.mp3",
+    E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
+    F2:"F2.mp3", F3:"F3.mp3"
+  },
+  release: 1,
+  baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/guitar-acoustic/",
+  onload: () => { guitarReady = true; }
+}).toDestination() : null;
+
+let bassReady = false;
+const bassSampler = hasTone ? new Tone.Sampler({
+  urls: {
+    "A#1":"As1.mp3", "A#2":"As2.mp3", "A#3":"As3.mp3", "A#4":"As4.mp3",
+    "C#1":"Cs1.mp3", "C#2":"Cs2.mp3", "C#3":"Cs3.mp3", "C#4":"Cs4.mp3",
+    E1:"E1.mp3", E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
+    G1:"G1.mp3", G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3"
+  },
+  release: 1.2,
+  baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/bass-electric/",
+  onload: () => { bassReady = true; }
+}).toDestination() : null;
 
 // A small pool of dedicated synth voices per instrument, reused round-robin
 // so a strummed or arpeggiated chord's overlapping notes don't cut each
@@ -879,8 +899,9 @@ async function playInstrumentNote(note, octaveUp){
   const offset = INSTRUMENT_OCTAVE_OFFSET[currentInstrument] || 0;
   const isBass = currentInstrument === "bass";
   const sampler = isBass ? bassSampler : guitarSampler;
+  const ready = isBass ? bassReady : guitarReady;
   const midiName = midiToNoteName(noteMidi(note, octaveUp) + offset);
-  if(sampler && sampler.loaded){
+  if(sampler && ready){
     sampler.triggerAttackRelease(midiName, isBass ? 1.1 : 0.8);
     return;
   }
@@ -922,7 +943,7 @@ const STRUM_STAGGER = 0.04;
 async function strumChord(rootIndex, intervals){
   await ensureAudioStarted();
   const offset = INSTRUMENT_OCTAVE_OFFSET.guitar;
-  if(guitarSampler && guitarSampler.loaded){
+  if(guitarReady){
     const now = Tone.now();
     intervals.forEach((iv, i) => {
       guitarSampler.triggerAttackRelease(midiToNoteName(69 + rootIndex + iv + offset), 1.0, now + i * STRUM_STAGGER);
@@ -952,7 +973,7 @@ const ARPEGGIO_STAGGER = 0.25;
 async function arpeggiateChord(rootIndex, intervals){
   await ensureAudioStarted();
   const offset = INSTRUMENT_OCTAVE_OFFSET.bass;
-  if(bassSampler && bassSampler.loaded){
+  if(bassReady){
     const now = Tone.now();
     intervals.forEach((iv, i) => {
       bassSampler.triggerAttackRelease(midiToNoteName(69 + rootIndex + iv + offset), 1.3, now + i * ARPEGGIO_STAGGER);
