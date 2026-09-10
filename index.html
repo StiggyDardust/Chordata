@@ -718,13 +718,14 @@ document.body.dataset.instrument = currentInstrument;
 /* ============================================================
    SOUND
    Real sampled instruments, played back through Tone.js: a grand
-   piano (Salamander Grand Piano) plus real acoustic guitar and
-   electric bass recordings (nbrosowsky/tonejs-instruments, CC-BY).
-   Three fallback tiers keep the app working if any of that can't
-   load — no internet, a blocked CDN: guitar/bass drop to a
-   dedicated oscillator+filter synth if only the samples fail, and
-   everything drops to a plain Web Audio oscillator if Tone.js
-   itself never loads.
+   piano (Salamander Grand Piano), a real acoustic guitar
+   (nbrosowsky/tonejs-instruments, CC-BY), and a real electric bass
+   (gleitz/midi-js-soundfonts, FluidR3_GM soundfont, MIT). Three
+   fallback tiers keep the app working if any of that can't load —
+   no internet, a blocked CDN: guitar/bass drop to a dedicated
+   oscillator+filter synth if only the samples fail, and everything
+   drops to a plain Web Audio oscillator if Tone.js itself never
+   loads.
    ============================================================ */
 
 const MIDI_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -786,13 +787,12 @@ const piano = hasTone ? new Tone.Sampler({
 }).toDestination() : null;
 if(hasTone) setTimeout(() => { pianoTimedOut = true; updateLoadingLock(); }, 8000);
 
-// Real acoustic guitar and electric bass recordings (nbrosowsky/tonejs-
-// instruments, CC-BY), loaded the exact same way as the piano above — a
-// plain Tone.Sampler with an explicit urls map. Unlike the piano, these
-// are created lazily (see ensureGuitarSampler/ensureBassSampler below),
-// only once you actually switch to that instrument, so their dozens of
-// sample requests aren't competing with the piano's — or each other's —
-// for the host's limited concurrent connections at page load.
+// Real acoustic guitar recordings (nbrosowsky/tonejs-instruments, CC-BY),
+// loaded the exact same way as the piano above — a plain Tone.Sampler with
+// an explicit urls map. Unlike the piano, this is created lazily (see
+// ensureGuitarSampler below), only once you actually switch to guitar, so
+// its dozens of sample requests aren't competing with the piano's for the
+// host's limited concurrent connections at page load.
 let guitarSampler = null;
 function ensureGuitarSampler(){
   if(guitarSampler || !hasTone) return guitarSampler;
@@ -813,25 +813,42 @@ function ensureGuitarSampler(){
     },
     release: 1,
     baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/guitar-acoustic/",
-    onload: () => { guitarReady = true; updateLoadingLock(); }
+    onload: () => { guitarReady = true; updateLoadingLock(); },
+    onerror: (err) => {
+      console.error("Guitar samples failed to load, falling back to synth:", err);
+      guitarTimedOut = true;
+      updateLoadingLock();
+    }
   }).toDestination();
   setTimeout(() => { guitarTimedOut = true; updateLoadingLock(); }, 8000);
   return guitarSampler;
 }
 
+// Real electric bass recordings, from a completely different host than the
+// guitar above (gleitz/midi-js-soundfonts, a FluidR3_GM soundfont export,
+// MIT licensed) — swapped in after the nbrosowsky bass-electric samples
+// kept silently falling back to the synth for reasons that didn't trace to
+// a filename typo or a loading race. onerror flips the same "give up and
+// unlock the UI" switch as the 8s timeout, so a real load failure doesn't
+// leave the fretboard needlessly locked.
 let bassSampler = null;
 function ensureBassSampler(){
   if(bassSampler || !hasTone) return bassSampler;
   bassSampler = new Tone.Sampler({
     urls: {
-      "A#1":"As1.mp3", "A#2":"As2.mp3", "A#3":"As3.mp3", "A#4":"As4.mp3",
-      "C#1":"Cs1.mp3", "C#2":"Cs2.mp3", "C#3":"Cs3.mp3", "C#4":"Cs4.mp3",
-      E1:"E1.mp3", E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
-      G1:"G1.mp3", G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3"
+      A1:"A1.mp3", C2:"C2.mp3", "D#2":"Eb2.mp3", "F#2":"Gb2.mp3",
+      A2:"A2.mp3", C3:"C3.mp3", "D#3":"Eb3.mp3", "F#3":"Gb3.mp3",
+      A3:"A3.mp3", C4:"C4.mp3", "D#4":"Eb4.mp3", "F#4":"Gb4.mp3",
+      A4:"A4.mp3", C5:"C5.mp3"
     },
     release: 1.2,
-    baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/bass-electric/",
-    onload: () => { bassReady = true; updateLoadingLock(); }
+    baseUrl: "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/electric_bass_finger-mp3/",
+    onload: () => { bassReady = true; updateLoadingLock(); },
+    onerror: (err) => {
+      console.error("Bass samples failed to load, falling back to synth:", err);
+      bassTimedOut = true;
+      updateLoadingLock();
+    }
   }).toDestination();
   setTimeout(() => { bassTimedOut = true; updateLoadingLock(); }, 8000);
   return bassSampler;
