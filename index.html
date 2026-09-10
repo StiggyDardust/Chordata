@@ -70,10 +70,11 @@
     font-size:0.85rem;
     margin:0 0 28px;
   }
-  body.piano-loading[data-instrument="piano"] .loading-banner{ display:block; }
-  body.piano-loading[data-instrument="piano"] .piano,
-  body.piano-loading[data-instrument="piano"] .type-btn,
-  body.piano-loading[data-instrument="piano"] .chord-row.playable{
+  body.sound-loading .loading-banner{ display:block; }
+  body.sound-loading .piano,
+  body.sound-loading .fretboard-wrap,
+  body.sound-loading .type-btn,
+  body.sound-loading .chord-row.playable{
     opacity:0.5;
     pointer-events:none;
   }
@@ -699,6 +700,12 @@ function setInstrument(instrument){
   document.querySelectorAll(".instrument-btn").forEach(btn => {
     btn.classList.toggle("selected", btn.dataset.instrument === instrument);
   });
+  // Guitar and bass samples only start downloading once you actually pick
+  // that instrument, so they're not competing with the piano (or each
+  // other) for bandwidth at page load.
+  if(instrument === "guitar") ensureGuitarSampler();
+  if(instrument === "bass") ensureBassSampler();
+  updateLoadingLock();
   renderExplorer();
   renderBuilder();
 }
@@ -732,13 +739,34 @@ function noteMidi(note, octaveUp){
 }
 
 const hasTone = typeof Tone !== "undefined";
-let pianoReady = false;
+let pianoReady = false, pianoTimedOut = false;
+let guitarReady = false, guitarTimedOut = false;
+let bassReady = false, bassTimedOut = false;
 let audioStarted = false;
 
-if(hasTone){
-  document.body.classList.add("piano-loading");
-  // Safety net: don't leave the UI locked if the samples never finish loading.
-  setTimeout(() => document.body.classList.remove("piano-loading"), 8000);
+// Whether the currently-selected instrument is playable yet — either its
+// real samples finished loading, or the 8s safety net gave up waiting and
+// let the UI open back up (playback then falls through to the synth tier).
+function isInstrumentUnlocked(instrument){
+  if(instrument === "piano") return pianoReady || pianoTimedOut;
+  if(instrument === "guitar") return guitarReady || guitarTimedOut;
+  if(instrument === "bass") return bassReady || bassTimedOut;
+  return true;
+}
+
+const LOADING_LABELS = {
+  piano: "Loading the grand piano…",
+  guitar: "Loading the acoustic guitar…",
+  bass: "Loading the electric bass…"
+};
+
+// Locks the piano/fretboard and chord controls, with a label naming
+// whichever instrument is currently loading, until it's ready to play.
+function updateLoadingLock(){
+  const locked = hasTone && !isInstrumentUnlocked(currentInstrument);
+  document.body.classList.toggle("sound-loading", locked);
+  const banner = document.querySelector(".loading-banner");
+  if(banner) banner.textContent = LOADING_LABELS[currentInstrument] || "Loading…";
 }
 
 const piano = hasTone ? new Tone.Sampler({
@@ -754,50 +782,62 @@ const piano = hasTone ? new Tone.Sampler({
   },
   release: 1,
   baseUrl: "https://tonejs.github.io/audio/salamander/",
-  onload: () => {
-    pianoReady = true;
-    document.body.classList.remove("piano-loading");
-  }
+  onload: () => { pianoReady = true; updateLoadingLock(); }
 }).toDestination() : null;
+if(hasTone) setTimeout(() => { pianoTimedOut = true; updateLoadingLock(); }, 8000);
 
 // Real acoustic guitar and electric bass recordings (nbrosowsky/tonejs-
-// instruments, CC-BY), loaded the exact same way as the piano above —
-// a plain Tone.Sampler with an explicit urls map — rather than through
-// that project's own SampleLibrary loader, whose default file-extension
-// handling left the sample URLs unresolved.
-let guitarReady = false;
-const guitarSampler = hasTone ? new Tone.Sampler({
-  urls: {
-    F4:"F4.mp3", "F#2":"Fs2.mp3", "F#3":"Fs3.mp3", "F#4":"Fs4.mp3",
-    G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3",
-    "G#2":"Gs2.mp3", "G#3":"Gs3.mp3", "G#4":"Gs4.mp3",
-    A2:"A2.mp3", A3:"A3.mp3", A4:"A4.mp3",
-    "A#2":"As2.mp3", "A#3":"As3.mp3", "A#4":"As4.mp3",
-    B2:"B2.mp3", B3:"B3.mp3", B4:"B4.mp3",
-    C3:"C3.mp3", C4:"C4.mp3", C5:"C5.mp3",
-    "C#3":"Cs3.mp3", "C#4":"Cs4.mp3", "C#5":"Cs5.mp3",
-    D2:"D2.mp3", D3:"D3.mp3", D4:"D4.mp3", D5:"D5.mp3",
-    "D#2":"Ds2.mp3", "D#3":"Ds3.mp3", "D#4":"Ds4.mp3",
-    E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
-    F2:"F2.mp3", F3:"F3.mp3"
-  },
-  release: 1,
-  baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/guitar-acoustic/",
-  onload: () => { guitarReady = true; }
-}).toDestination() : null;
+// instruments, CC-BY), loaded the exact same way as the piano above — a
+// plain Tone.Sampler with an explicit urls map. Unlike the piano, these
+// are created lazily (see ensureGuitarSampler/ensureBassSampler below),
+// only once you actually switch to that instrument, so their dozens of
+// sample requests aren't competing with the piano's — or each other's —
+// for the host's limited concurrent connections at page load.
+let guitarSampler = null;
+function ensureGuitarSampler(){
+  if(guitarSampler || !hasTone) return guitarSampler;
+  guitarSampler = new Tone.Sampler({
+    urls: {
+      F4:"F4.mp3", "F#2":"Fs2.mp3", "F#3":"Fs3.mp3", "F#4":"Fs4.mp3",
+      G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3",
+      "G#2":"Gs2.mp3", "G#3":"Gs3.mp3", "G#4":"Gs4.mp3",
+      A2:"A2.mp3", A3:"A3.mp3", A4:"A4.mp3",
+      "A#2":"As2.mp3", "A#3":"As3.mp3", "A#4":"As4.mp3",
+      B2:"B2.mp3", B3:"B3.mp3", B4:"B4.mp3",
+      C3:"C3.mp3", C4:"C4.mp3", C5:"C5.mp3",
+      "C#3":"Cs3.mp3", "C#4":"Cs4.mp3", "C#5":"Cs5.mp3",
+      D2:"D2.mp3", D3:"D3.mp3", D4:"D4.mp3", D5:"D5.mp3",
+      "D#2":"Ds2.mp3", "D#3":"Ds3.mp3", "D#4":"Ds4.mp3",
+      E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
+      F2:"F2.mp3", F3:"F3.mp3"
+    },
+    release: 1,
+    baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/guitar-acoustic/",
+    onload: () => { guitarReady = true; updateLoadingLock(); }
+  }).toDestination();
+  setTimeout(() => { guitarTimedOut = true; updateLoadingLock(); }, 8000);
+  return guitarSampler;
+}
 
-let bassReady = false;
-const bassSampler = hasTone ? new Tone.Sampler({
-  urls: {
-    "A#1":"As1.mp3", "A#2":"As2.mp3", "A#3":"As3.mp3", "A#4":"As4.mp3",
-    "C#1":"Cs1.mp3", "C#2":"Cs2.mp3", "C#3":"Cs3.mp3", "C#4":"Cs4.mp3",
-    E1:"E1.mp3", E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
-    G1:"G1.mp3", G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3"
-  },
-  release: 1.2,
-  baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/bass-electric/",
-  onload: () => { bassReady = true; }
-}).toDestination() : null;
+let bassSampler = null;
+function ensureBassSampler(){
+  if(bassSampler || !hasTone) return bassSampler;
+  bassSampler = new Tone.Sampler({
+    urls: {
+      "A#1":"As1.mp3", "A#2":"As2.mp3", "A#3":"As3.mp3", "A#4":"As4.mp3",
+      "C#1":"Cs1.mp3", "C#2":"Cs2.mp3", "C#3":"Cs3.mp3", "C#4":"Cs4.mp3",
+      E1:"E1.mp3", E2:"E2.mp3", E3:"E3.mp3", E4:"E4.mp3",
+      G1:"G1.mp3", G2:"G2.mp3", G3:"G3.mp3", G4:"G4.mp3"
+    },
+    release: 1.2,
+    baseUrl: "https://nbrosowsky.github.io/tonejs-instruments/samples/bass-electric/",
+    onload: () => { bassReady = true; updateLoadingLock(); }
+  }).toDestination();
+  setTimeout(() => { bassTimedOut = true; updateLoadingLock(); }, 8000);
+  return bassSampler;
+}
+
+updateLoadingLock();
 
 // A small pool of dedicated synth voices per instrument, reused round-robin
 // so a strummed or arpeggiated chord's overlapping notes don't cut each
